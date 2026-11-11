@@ -19,13 +19,17 @@ else if (path.endsWith('/dispatches')) fs.writeFileSync(process.env.DISPATCH_INP
 else if (path.includes('/workflows/') && path.includes('/runs?')) {
  const input = JSON.parse(fs.readFileSync(process.env.DISPATCH_INPUT));
  send({workflow_runs:[{id:123,display_title:'simulator-'+input.inputs.session_id,head_sha:process.env.FAIL_MODE==='run'?'b'.repeat(40):'a'.repeat(40),html_url:'https://github.com/owner/harness/actions/runs/123'}]});
-} else if (path.includes('/artifacts?')) send({artifacts:[]});
+} else if (path.includes('/artifacts?')) {
+ const calls=fs.readFileSync(process.env.CALL_LOG,'utf8').trim().split('\\n').map(JSON.parse).filter(a=>a.some(x=>x.includes('/artifacts?')));
+ if(process.env.FAIL_MODE==='transient' && calls.length===1) { console.error('error connecting to api.github.com'); process.exit(1); }
+ send({artifacts:[]});
+}
 else if (path.endsWith('/cancel')) {}
-else if (path.endsWith('/runs/123')) send({id:123,status:process.env.FAIL_MODE==='readiness'?'completed':'in_progress'});
+else if (path.endsWith('/runs/123')) send({id:123,status:['readiness','transient'].includes(process.env.FAIL_MODE)?'completed':'in_progress'});
 else { console.error('Unexpected fake GitHub request'); process.exit(1); }
 `;
 
-for (const mode of ['ref', 'run', 'readiness']) {
+for (const mode of ['ref', 'run', 'readiness', 'transient']) {
   test(`startup ${mode} failure does not leave a second or untracked simulator job`, async () => {
     const directory = await mkdtemp(join(tmpdir(), 'simulator-client-test-'));
     try {
@@ -46,6 +50,7 @@ for (const mode of ['ref', 'run', 'readiness']) {
       assert.equal(cancellations.length, mode === 'run' ? 1 : 0);
       if (cancellations.length) assert.ok(cancellations[0].includes('repos/owner/harness/actions/runs/123/cancel'));
       assert.equal(calls.some((args) => args.includes('download')), false);
+      if (mode === 'transient') assert.equal(calls.filter(args=>args.some(arg=>arg.includes('/artifacts?'))).length, 2);
       assert.equal(result.stdout.includes('PRIVATE KEY'), false);
       assert.equal(result.stderr.includes('PRIVATE KEY'), false);
     } finally { await rm(directory, { recursive: true, force: true }); }

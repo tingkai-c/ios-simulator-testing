@@ -53,9 +53,14 @@ function command(bin, args, { input, env = process.env, inherit = false, timeout
 }
 
 async function gh(args, input) {
-  const result = await command('gh', args, { input });
-  if (result.code !== 0) throw new Error('GitHub request failed; check gh authentication and repository Actions permissions');
-  return result.stdout.trim() ? JSON.parse(result.stdout) : null;
+  // Retry reads only. Dispatch/cancel are never repeated after an ambiguous failure.
+  const attempts = args[0] === 'api' && !args.includes('--method') && input === undefined ? 3 : 1;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const result = await command('gh', args, { input });
+    if (result.code === 0) return result.stdout.trim() ? JSON.parse(result.stdout) : null;
+    if (attempt + 1 < attempts) await sleep(1000 * (attempt + 1));
+  }
+  throw new Error('GitHub request failed; check gh authentication and repository Actions permissions');
 }
 
 async function save(path, data) {
