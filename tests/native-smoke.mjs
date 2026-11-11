@@ -30,7 +30,9 @@ async function main() {
   const deadline = Date.now() + 12 * 60 * 1000;
   const children = new Set();
   let host, connection, hostComplete, passed = false;
-  const clientEnv = { ...clean, AGENT_DEVICE_STATE_DIR: join(directory, 'client-state'),
+  const clientEnv = { ...clean,
+    NODE_OPTIONS: `${clean.NODE_OPTIONS ?? ''} --require ${JSON.stringify(join(root, 'skills/ios-simulator-testing/scripts/lib/tunnel-dns.cjs'))}`.trim(),
+    AGENT_DEVICE_STATE_DIR: join(directory, 'client-state'),
     AGENT_DEVICE_HOME: join(directory, 'client-home'), AGENT_DEVICE_CONFIG: join(directory, 'client-config.json'),
     AGENT_DEVICE_SESSION: sessionId, AGENT_DEVICE_NO_UPDATE_NOTIFIER: '1' };
   await writeFile(clientEnv.AGENT_DEVICE_CONFIG, '{}', { mode: 0o600 });

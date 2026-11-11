@@ -79,6 +79,7 @@ export function deviceEnv(session, path) {
     AGENT_DEVICE_HOME: join(dirname(path), 'device-home'),
     AGENT_DEVICE_CONFIG: join(dirname(path), 'device-config.json'),
     AGENT_DEVICE_NO_UPDATE_NOTIFIER: '1',
+    NODE_OPTIONS: `${inherited.NODE_OPTIONS ?? ''} --require ${JSON.stringify(join(skillDir, 'scripts/lib/tunnel-dns.cjs'))}`.trim(),
   };
 }
 
@@ -260,3 +261,4 @@ export async function main(argv) {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main(process.argv.slice(2)).catch((error) => { console.error(error.message); process.exitCode = 1; });
 }
+import './lib/tunnel-dns.cjs';

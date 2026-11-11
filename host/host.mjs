@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createGateway } from './gateway.mjs';
 import { seal } from '../skills/ios-simulator-testing/scripts/lib/envelope.mjs';
+import '../skills/ios-simulator-testing/scripts/lib/tunnel-dns.cjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const VERSION = '0.21.36';
@@ -69,7 +70,9 @@ export async function main() {
   const deviceConfig = join(privateDir, 'device-config.json');
   await writeFile(deviceConfig, '{}', { mode: 0o600 });
   const inherited = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith('AGENT_DEVICE_')));
-  const environment = { ...inherited, AGENT_DEVICE_SESSION: config.sessionId,
+  const environment = { ...inherited,
+    NODE_OPTIONS: `${inherited.NODE_OPTIONS ?? ''} --require ${JSON.stringify(join(ROOT, 'skills/ios-simulator-testing/scripts/lib/tunnel-dns.cjs'))}`.trim(),
+    AGENT_DEVICE_SESSION: config.sessionId,
     AGENT_DEVICE_STATE_DIR: join(privateDir, 'daemon'), AGENT_DEVICE_HOME: join(privateDir, 'device-home'),
     AGENT_DEVICE_CONFIG: deviceConfig, AGENT_DEVICE_NO_UPDATE_NOTIFIER: '1' };
   const executable = join(ROOT, 'skills/ios-simulator-testing/node_modules/.bin/agent-device');

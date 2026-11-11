@@ -2,6 +2,7 @@
 import http from 'node:http';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
+import '../skills/ios-simulator-testing/scripts/lib/tunnel-dns.cjs';
 
 const server = http.createServer((_request, response) => response.end('public-health-only'));
 await new Promise((done) => server.listen(4320, '127.0.0.1', done));
