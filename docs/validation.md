@@ -9,7 +9,7 @@ node --test tests/*.test.mjs
 python3 -m unittest discover -s tests -p 'test_*.py'
 ```
 
-The current regression suite has 24 Node tests and 10 Python tests. The skill frontmatter and references pass Codex's skill-creator validator and an independent read-only skill scenario. Those checks cannot prove native iOS behavior.
+The current regression suite has 25 Node tests and 10 Python tests. The skill frontmatter and references pass Codex's skill-creator validator and an independent read-only skill scenario. Those checks cannot prove native iOS behavior.
 
 The manual **Synthetic native smoke** workflow compiles a tiny public UIKit demo and validates the encrypted bootstrap, authenticated app upload, accessibility interaction, screenshot, fixture export/import, and shutdown. Its synthetic client uses the host’s loopback gateway to isolate fixture correctness from Quick Tunnel availability. Cloud transport is verified separately from a Linux agent. It uses synthetic state only and uploads no private captures or raw host diagnostics.
 
@@ -18,6 +18,8 @@ The manual **Synthetic native smoke** workflow compiles a tiny public UIKit demo
 - [Synthetic native smoke](https://github.com/tingkai-c/ios-simulator-testing/actions/runs/43082424584) uploaded its app, then failed during UI interaction. Later runs isolated an Xcode destination failure for iOS 26.5. The upstream-tested iOS 26.2 runtime passed upload, initial counter assertions, tapping, and app-data export; a subsequent 10-second UI wait expired while XCTest restarted after the fixture reboot. The corrected smoke allows 120 seconds for that readiness phase. Complete import/restore verification is still pending.
 
 Follow-up validation has not established reliable fixture restoration: the [loopback smoke](https://github.com/tingkai-c/ios-simulator-testing/actions/runs/43093925840) failed its native test step. The [latest Linux session](https://github.com/tingkai-c/ios-simulator-testing/actions/runs/43094339986) reached simulator readiness, but encrypted bootstrap artifact publication stalled before the client could connect. Both runs received cancellation requests. Treat session provisioning as experimental and full app-data import/restore as unverified.
+
+The [reported startup failure](https://github.com/tingkai-c/ios-simulator-testing/actions/runs/43096585156) completed with `startup_failure` and zero jobs/check runs. Its run-summary annotation reported an unexpected GitHub internal error, request ID `d15bde3e-de0f-11f1-879c-a19523623db7`. No simulator or app commands ran. The client now identifies this conclusion and points to run annotations; a regression test verifies that diagnosis without dispatching a duplicate job. The annotation does not establish a public service-wide outage.
 
 Cold setup took about five minutes in these runs; the first app open took roughly another minute, with later snapshots and taps taking seconds. This is a small sample, not a latency guarantee.
 

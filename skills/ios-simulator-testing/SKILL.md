@@ -25,6 +25,8 @@ Save `stateFile` from the JSON result as `STATE`. Default is `macos-latest` with
 
 Session state contains credentials: keep it outside repositories and shared artifacts. Read the helper's `--help` for the small lifecycle surface; keep tokens out of tool arguments, chat, and logs. Every command below uses `node "$SIM" exec --state "$STATE" --` as its prefix.
 
+If GitHub reports `startup_failure` without jobs, inspect the run summary's Annotations; no simulator commands have run. An empty job list or missing logs alone does not identify the cause. For an explicit transient GitHub error, allow one fresh `start` with a new session/keypair after confirming the failed run is completed. Do not rerun another agent's workflow with its old recipient key; you need its matching local private key to decrypt that bootstrap. Stop repeated allocation if the error persists and report the run URL and GitHub request ID.
+
 ## Observe, act, verify
 
 ```sh

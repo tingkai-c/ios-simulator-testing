@@ -162,7 +162,12 @@ async function start(options) {
       artifact = artifacts.artifacts.find((item) => item.name === `session-${sessionId}` && !item.expired);
       if (artifact) break;
       const current = await gh(['api', `repos/${repository}/actions/runs/${run.id}`]);
-      if (current.status === 'completed') throw new Error('Simulator job ended before readiness; public logs contain only sanitized status');
+      if (current.status === 'completed') {
+        if (current.conclusion === 'startup_failure') {
+          throw new Error(`GitHub workflow startup failed (startup_failure). Simulator controls were not reached; inspect run annotations: ${session.runUrl}`);
+        }
+        throw new Error('Simulator job ended before readiness; public logs contain only sanitized status');
+      }
       await sleep(10_000);
     }
     if (!artifact) throw new Error('Simulator readiness timed out');

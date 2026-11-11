@@ -25,11 +25,11 @@ else if (path.includes('/workflows/') && path.includes('/runs?')) {
  send({artifacts:[]});
 }
 else if (path.endsWith('/cancel')) {}
-else if (path.endsWith('/runs/123')) send({id:123,status:['readiness','transient'].includes(process.env.FAIL_MODE)?'completed':'in_progress'});
+else if (path.endsWith('/runs/123')) send({id:123,status:['readiness','transient','startup'].includes(process.env.FAIL_MODE)?'completed':'in_progress',conclusion:process.env.FAIL_MODE==='startup'?'startup_failure':'failure'});
 else { console.error('Unexpected fake GitHub request'); process.exit(1); }
 `;
 
-for (const mode of ['ref', 'run', 'readiness', 'transient']) {
+for (const mode of ['ref', 'run', 'readiness', 'transient', 'startup']) {
   test(`startup ${mode} failure does not leave a second or untracked simulator job`, async () => {
     const directory = await mkdtemp(join(tmpdir(), 'simulator-client-test-'));
     try {
@@ -51,6 +51,11 @@ for (const mode of ['ref', 'run', 'readiness', 'transient']) {
       if (cancellations.length) assert.ok(cancellations[0].includes('repos/owner/harness/actions/runs/123/cancel'));
       assert.equal(calls.some((args) => args.includes('download')), false);
       if (mode === 'transient') assert.equal(calls.filter(args=>args.some(arg=>arg.includes('/artifacts?'))).length, 2);
+      if (mode === 'startup') {
+        assert.match(result.stderr, /GitHub workflow startup failed \(startup_failure\)/);
+        assert.match(result.stderr, /annotations: https:\/\/github\.com\/owner\/harness\/actions\/runs\/123/);
+        assert.match(result.stderr, /Simulator controls were not reached/);
+      }
       assert.equal(result.stdout.includes('PRIVATE KEY'), false);
       assert.equal(result.stderr.includes('PRIVATE KEY'), false);
     } finally { await rm(directory, { recursive: true, force: true }); }
