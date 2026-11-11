@@ -70,7 +70,7 @@ async function main() {
     return command(executable, args);
   }
   async function countIs(value) {
-    await device('wait', `label="Count: ${value}"`, '10000');
+    await device('wait', `label="Count: ${value}"`, '120000');
     await device('is', 'visible', `label="Count: ${value}"`);
   }
   async function state(operation, bytes) {

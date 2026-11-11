@@ -21,7 +21,7 @@ Select a reviewed commit in `tingkai-c/ios-simulator-testing` and a branch/tag p
 node "$SIM" start --repo tingkai-c/ios-simulator-testing --ref main --sha REVIEWED_FULL_SHA
 ```
 
-Save `stateFile` from the JSON result as `STATE`. Choose `--runner xcode-27` only when the app needs that toolchain; default is `macos-latest`. Start waits for an encrypted connection bundle and validates the run identity. A readiness timeout triggers cancellation; use the printed private session path with `status`/`stop` before allocating another job.
+Save `stateFile` from the JSON result as `STATE`. Default is `macos-latest` with iOS 26.2, matching the driver’s upstream CI. Select another installed version with `--ios-version VERSION`, or `newest`; a missing or mismatched version fails explicitly. Choose `--runner xcode-27` when the app needs that toolchain and select its required runtime. Start waits for an encrypted connection bundle and validates the run identity. A readiness timeout triggers cancellation; use the printed private session path with `status`/`stop` before allocating another job.
 
 Session state contains credentials: keep it outside repositories and shared artifacts. Read the helper's `--help` for the small lifecycle surface; keep tokens out of tool arguments, chat, and logs. Every command below uses `node "$SIM" exec --state "$STATE" --` as its prefix.
 
@@ -49,10 +49,10 @@ For container fixtures, use:
 node "$SIM" state-export --state "$STATE" --bundle com.example.app --out /private/fixtures/before.zip
 node "$SIM" state-import --state "$STATE" --bundle com.example.app --file /private/fixtures/scenario.zip
 node "$SIM" exec --state "$STATE" -- open com.example.app
-node "$SIM" exec --state "$STATE" -- snapshot -i
+node "$SIM" exec --state "$STATE" -- snapshot -i --timeout 120000
 ```
 
-The helper closes the active device-control session and the host stops the simulator during transfer; the cloud job stays allocated. Import replaces `Documents` and `Library`; export first if existing state matters. Use a matching app build/runtime and the same bundle ID. Keychain, shared App Groups, push tokens, and remote backend state need separate app-specific setup. Prefer app-provided test seed/import hooks for versioned logical fixtures. A UI snapshot does not save app data.
+The helper closes the active device-control session and the host stops the simulator during transfer; the cloud job stays allocated. After reboot, allow up to 120 seconds for the first UI capture or wait while XCTest restarts; later controls can use normal timeouts. Import replaces `Documents` and `Library`; export first if existing state matters. Use a matching app build/runtime and the same bundle ID. Keychain, shared App Groups, push tokens, and remote backend state need separate app-specific setup. Prefer app-provided test seed/import hooks for versioned logical fixtures. A UI snapshot does not save app data.
 
 ## Finish
 

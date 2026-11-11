@@ -36,11 +36,11 @@ node skills/ios-simulator-testing/scripts/simulator.mjs exec --state SESSION_JSO
 node skills/ios-simulator-testing/scripts/simulator.mjs stop --state SESSION_JSON
 ```
 
-Sessions default to 15 minutes; configurable from 5 to 30. `--runner xcode-27` is available for apps requiring that preview toolchain. Each job owns one simulator. Run separate sessions for independent agents; keep commands serial within a session. Public workflow metadata reveals runner choice, session timing, and job status.
+Sessions default to 15 minutes; configurable from 5 to 30. iOS 26.2 is the default runtime, matching the driver’s upstream CI. Set `--ios-version VERSION` or `--ios-version newest` for another installed runtime; unavailable versions fail explicitly. `--runner xcode-27` is available for apps requiring that preview toolchain. Each job owns one simulator. Run separate sessions for independent agents; keep commands serial within a session. Public workflow metadata reveals runner choice, session timing, and job status.
 
 ## App data
 
-`state-export --bundle com.example.app --out fixture.zip` and `state-import --bundle com.example.app --file fixture.zip` accept `--state SESSION_JSON`. They close the active device session and stop the simulator while copying `Documents` and `Library`. Reopen the app and take a fresh UI snapshot afterward. Import replaces these directories; export first when the existing test state matters.
+`state-export --bundle com.example.app --out fixture.zip` and `state-import --bundle com.example.app --file fixture.zip` accept `--state SESSION_JSON`. They close the active device session and stop the simulator while copying `Documents` and `Library`. Reopen the app and take a fresh UI snapshot afterward, allowing `--timeout 120000` for XCTest to restart after the reboot. Import replaces these directories; export first when the existing test state matters.
 
 Fixtures are app-container ZIPs with a bundle-bound manifest. Use the same app build/runtime for reliable restoration. They exclude Keychain, App Groups, push tokens, and remote backend state. A UI `snapshot` is an accessibility tree, not an app-data checkpoint.
 

@@ -27,6 +27,13 @@ test('fixture operations can follow an earlier close without ignoring transport/
   assert.equal(alreadyClosed({ code: 1, stdout: 'connection failed' }), false);
 });
 
+test('bootstrap runtime must match an explicit request', () => {
+  assert.equal(checkBootstrap({ ...valid, iosVersion: '26.2' }, { ...expected, requestedIosVersion: '26.2' }).iosVersion, '26.2');
+  assert.throws(() => checkBootstrap({ ...valid, iosVersion: '26.5' }, { ...expected, requestedIosVersion: '26.2' }));
+  assert.throws(() => checkBootstrap(valid, { ...expected, requestedIosVersion: '26.2' }));
+  assert.equal(checkBootstrap({ ...valid, iosVersion: '26.5' }, { ...expected, requestedIosVersion: 'newest' }).iosVersion, '26.5');
+});
+
 test('an existing agent-device profile cannot reroute private uploads', () => {
   process.env.AGENT_DEVICE_DAEMON_BASE_URL = 'https://wrong-host.example';
   process.env.AGENT_DEVICE_CONFIG = '/other-agent/config.json';

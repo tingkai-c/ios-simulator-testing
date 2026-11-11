@@ -21,7 +21,7 @@ export function configuration(env = process.env) {
   if (!/^\d+$/.test(env.GITHUB_RUN_ID ?? '')) throw new Error('Invalid run identifier');
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(env.GITHUB_REPOSITORY ?? '')) throw new Error('Invalid repository');
   if (!env.BOOTSTRAP_PATH) throw new Error('Missing bootstrap output path');
-  const iosVersion = env.SIMULATOR_IOS_VERSION ?? 'newest';
+  const iosVersion = env.SIMULATOR_IOS_VERSION ?? '26.2';
   if (iosVersion !== 'newest' && !/^\d{1,2}\.\d{1,2}(?:\.\d{1,2})?$/.test(iosVersion)) throw new Error('Invalid iOS runtime version');
   if (!env.RECIPIENT_KEY || env.RECIPIENT_KEY.length > 8192) throw new Error('Invalid recipient key');
   const key = createPublicKey({ key: Buffer.from(env.RECIPIENT_KEY, 'base64'), format: 'der', type: 'spki' });
@@ -184,7 +184,7 @@ export async function main({ onFailure } = {}) {
     const expiresAt = new Date(Date.now() + config.minutes * 60000).toISOString();
     const payload = { sessionId: config.sessionId, runId: config.runId, repository: config.repository,
       baseUrl: `${endpoint}/agent-device`, controlUrl: endpoint, token, udid: simulator.udid,
-      expiresAt, agentDeviceVersion: VERSION };
+      expiresAt, iosVersion: simulator.version.join('.'), agentDeviceVersion: VERSION };
     const envelope = seal(payload, config.recipientKey, config.sessionId);
     await mkdir(dirname(config.bootstrapPath), { recursive: true });
     await writeFile(config.bootstrapPath, JSON.stringify(envelope), { flag: 'wx', mode: 0o600 });

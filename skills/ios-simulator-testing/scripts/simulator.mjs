@@ -15,6 +15,10 @@ const workflow = 'session.yml';
 const maxFixture = 256 * 1024 * 1024;
 
 export function checkBootstrap(data, expected, now = Date.now()) {
+  if ((data.iosVersion !== undefined && !/^\d{1,2}\.\d{1,2}(?:\.\d{1,2})?$/.test(data.iosVersion))
+      || (expected.requestedIosVersion && expected.requestedIosVersion !== 'newest' && data.iosVersion !== expected.requestedIosVersion)) {
+    throw new Error('Bootstrap iOS runtime does not match the requested version');
+  }
   if (data.sessionId !== expected.sessionId || String(data.runId) !== String(expected.runId)
       || data.repository !== expected.repository || data.agentDeviceVersion !== '0.21.36') {
     throw new Error('Bootstrap identity or version does not match the requested run');
@@ -120,17 +124,19 @@ async function start(options) {
   if (!Number.isInteger(minutes) || minutes < 5 || minutes > 30) throw new Error('--minutes must be an integer from 5 to 30');
   const runner = options.runner ?? 'macos-latest';
   if (!['macos-latest', 'xcode-27'].includes(runner)) throw new Error('Unsupported runner');
+  const iosVersion = options['ios-version'] ?? '26.2';
+  if (iosVersion !== 'newest' && !/^\d{1,2}\.\d{1,2}(?:\.\d{1,2})?$/.test(iosVersion)) throw new Error('Unsupported iOS runtime version');
   const sessionId = randomBytes(16).toString('hex');
   const stateRoot = resolve(options['state-dir'] ?? join(homedir(), '.local', 'state', 'ios-simulator-testing'));
   const path = join(stateRoot, sessionId, 'session.json');
   const keys = keypair();
-  let session = { sessionId, repository, ref, sha: options.sha, privateKey: keys.privateKey };
+  let session = { sessionId, repository, ref, sha: options.sha, requestedIosVersion: iosVersion, privateKey: keys.privateKey };
   await save(path, session);
   process.stderr.write(`Session state: ${path}\n`);
   try {
     await gh(['api', '--method', 'POST', `repos/${repository}/actions/workflows/${workflow}/dispatches`, '--input', '-'], JSON.stringify({
       ref,
-      inputs: { session_id: sessionId, recipient_key: keys.publicKey, lifetime_minutes: String(minutes), runner },
+      inputs: { session_id: sessionId, recipient_key: keys.publicKey, lifetime_minutes: String(minutes), runner, ios_version: iosVersion },
     }));
     let run;
     const discoveryDeadline = Date.now() + 120_000;
@@ -205,7 +211,7 @@ export function alreadyClosed(result) {
 
 const help = `Usage: node simulator.mjs <start|exec|state-import|state-export|status|stop> [options] [-- agent-device arguments]
 
-start --repo OWNER/REPO --sha FULL_SHA [--ref main] [--runner macos-latest|xcode-27] [--minutes 15] [--state-dir PRIVATE_DIR]
+start --repo OWNER/REPO --sha FULL_SHA [--ref main] [--runner macos-latest|xcode-27] [--ios-version 26.2|newest] [--minutes 15] [--state-dir PRIVATE_DIR]
 exec --state SESSION_JSON -- snapshot -i
 state-export --state SESSION_JSON --bundle com.example.app --out fixture.zip
 state-import --state SESSION_JSON --bundle com.example.app --file fixture.zip
@@ -222,7 +228,7 @@ export async function main(argv) {
   const rawArgs = divider < 0 ? [] : rest.slice(divider + 1);
   const { values: options } = parseArgs({ args: divider < 0 ? rest : rest.slice(0, divider), options: {
     repo: { type: 'string' }, ref: { type: 'string' }, sha: { type: 'string' }, runner: { type: 'string' }, minutes: { type: 'string' },
-    'state-dir': { type: 'string' }, state: { type: 'string' }, bundle: { type: 'string' },
+    'ios-version': { type: 'string' }, 'state-dir': { type: 'string' }, state: { type: 'string' }, bundle: { type: 'string' },
     out: { type: 'string' }, file: { type: 'string' },
   } });
   if (action === 'start') { console.log(JSON.stringify(await start(options))); return; }

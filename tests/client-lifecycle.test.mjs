@@ -41,6 +41,7 @@ for (const mode of ['ref', 'run', 'readiness']) {
       const calls = (await readFile(log, 'utf8')).trim().split('\n').map(JSON.parse);
       const dispatches = calls.filter((args) => args.some((arg) => arg.endsWith('/dispatches')));
       assert.equal(dispatches.length, mode === 'ref' ? 0 : 1, result.stderr);
+      if (mode !== 'ref') assert.equal(JSON.parse(await readFile(join(directory, 'dispatch.json'), 'utf8')).inputs.ios_version, '26.2');
       const cancellations = calls.filter((args) => args.some((arg) => arg.endsWith('/cancel')));
       assert.equal(cancellations.length, mode === 'run' ? 1 : 0);
       if (cancellations.length) assert.ok(cancellations[0].includes('repos/owner/harness/actions/runs/123/cancel'));

@@ -22,6 +22,10 @@ on:
           - macos-latest
           - xcode-27
         default: macos-latest
+      ios_version:
+        description: Installed iOS runtime version, or newest (26.2 matches upstream CI)
+        type: string
+        default: '26.2'
 permissions:
   contents: read
 concurrency:
@@ -35,6 +39,7 @@ jobs:
       SESSION_ID: ${{ inputs.session_id }}
       RECIPIENT_KEY: ${{ inputs.recipient_key }}
       SESSION_MINUTES: ${{ inputs.lifetime_minutes }}
+      SIMULATOR_IOS_VERSION: ${{ inputs.ios_version }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
