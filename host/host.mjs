@@ -54,7 +54,7 @@ export function tunnelUrl(log) {
   return match?.[0] ?? null;
 }
 
-export async function main() {
+export async function main({ onFailure } = {}) {
   process.umask(0o077);
   let config;
   try { config = configuration(); }
@@ -201,6 +201,9 @@ export async function main() {
     return 0;
   } catch (error) {
     await writeFile(join(privateDir, 'host-error.log'), String(error?.stack ?? error), { mode: 0o600 });
+    if (onFailure) {
+      try { await onFailure({ stage, privateDir }); } catch {}
+    }
     process.stderr.write(`Simulator session failed at ${stage}. Private diagnostics were not published.\n`);
     return 1;
   } finally {

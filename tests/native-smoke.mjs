@@ -110,7 +110,7 @@ async function main() {
     await command('codesign', ['--force', '--sign', '-', '--timestamp=none', app]);
     stage = 'host startup';
     process.stdout.write('Starting isolated simulator host.\n');
-    host = spawn(process.execPath, [join(root, 'host/host.mjs')], {
+    host = spawn(process.execPath, [join(root, 'tests/native-host.mjs')], {
       cwd: root, env: { ...clean, SESSION_ID: sessionId, SESSION_MINUTES: '15',
         RECIPIENT_KEY: keys.publicKey, BOOTSTRAP_PATH: bootstrap,
         GITHUB_RUN_ID: process.env.GITHUB_RUN_ID || '1',
@@ -201,7 +201,9 @@ async function main() {
     if (!passed) {
       if (process.env.DIAGNOSTIC_RECIPIENT_KEY) {
         const logs = (await readFile(join(directory, 'client.log'))).subarray(-4 * 1024 * 1024).toString();
-        const encrypted = seal({ runId: process.env.GITHUB_RUN_ID, stage, logs }, process.env.DIAGNOSTIC_RECIPIENT_KEY, 'native-smoke');
+        let hostFailure;
+        try { hostFailure = unseal(JSON.parse(await readFile(join(directory, 'encrypted-native-host.json'), 'utf8')), keys.privateKey, sessionId); } catch {}
+        const encrypted = seal({ runId: process.env.GITHUB_RUN_ID, stage, logs, hostFailure }, process.env.DIAGNOSTIC_RECIPIENT_KEY, 'native-smoke');
         await writeFile(join(process.env.RUNNER_TEMP, 'encrypted-native-smoke.json'), JSON.stringify(encrypted), { mode: 0o600 });
       }
       const hostOutput = await readFile(publicOutput, 'utf8').catch(() => '');
