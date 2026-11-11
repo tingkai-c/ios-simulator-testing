@@ -77,7 +77,9 @@ export async function main({ onFailure } = {}) {
     NODE_OPTIONS: `${inherited.NODE_OPTIONS ?? ''} --require ${JSON.stringify(join(ROOT, 'skills/ios-simulator-testing/scripts/lib/tunnel-dns.cjs'))}`.trim(),
     AGENT_DEVICE_SESSION: config.sessionId,
     AGENT_DEVICE_STATE_DIR: join(privateDir, 'daemon'), AGENT_DEVICE_HOME: join(privateDir, 'device-home'),
-    AGENT_DEVICE_CONFIG: deviceConfig, AGENT_DEVICE_NO_UPDATE_NOTIFIER: '1' };
+    AGENT_DEVICE_CONFIG: deviceConfig, AGENT_DEVICE_NO_UPDATE_NOTIFIER: '1',
+    AGENT_DEVICE_IOS_RUNNER_DERIVED_PATH: join(privateDir, 'runner-derived'),
+    AGENT_DEVICE_XCUITEST_ARCHS: 'arm64' };
   const executable = join(ROOT, 'skills/ios-simulator-testing/node_modules/.bin/agent-device');
   const children = new Set();
   const handles = [];
