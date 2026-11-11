@@ -1,6 +1,11 @@
 name: Synthetic native smoke
 on:
   workflow_dispatch:
+    inputs:
+      recipient_key:
+        description: Optional RSA public key for encrypted synthetic-test diagnostics
+        type: string
+        required: false
 permissions:
   contents: read
 jobs:
@@ -22,7 +27,17 @@ jobs:
           bun install --cwd skills/ios-simulator-testing --frozen-lockfile
           brew install cloudflared
       - name: Exercise synthetic app, live tunnel, controls, and fixtures
+        env:
+          DIAGNOSTIC_RECIPIENT_KEY: ${{ inputs.recipient_key }}
         run: node tests/native-smoke.mjs
+      - name: Publish only encrypted synthetic-test diagnostics
+        if: ${{ failure() && inputs.recipient_key != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: encrypted-synthetic-diagnostics
+          path: ${{ runner.temp }}/encrypted-native-smoke.json
+          if-no-files-found: ignore
+          retention-days: 1
       - name: Stop simulators
         if: always()
         run: xcrun simctl shutdown all >/dev/null 2>&1 || true

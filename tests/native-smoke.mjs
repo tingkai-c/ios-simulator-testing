@@ -6,7 +6,7 @@ import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
-import { keypair, unseal } from '../skills/ios-simulator-testing/scripts/lib/envelope.mjs';
+import { keypair, seal, unseal } from '../skills/ios-simulator-testing/scripts/lib/envelope.mjs';
 import { checkBootstrap } from '../skills/ios-simulator-testing/scripts/simulator.mjs';
 import { HOST_STAGES } from '../host/host.mjs';
 
@@ -197,6 +197,11 @@ async function main() {
     await privateLog.close();
     await hostLog.close();
     if (!passed) {
+      if (process.env.DIAGNOSTIC_RECIPIENT_KEY) {
+        const logs = (await readFile(join(directory, 'client.log'))).subarray(-4 * 1024 * 1024).toString();
+        const encrypted = seal({ runId: process.env.GITHUB_RUN_ID, stage, logs }, process.env.DIAGNOSTIC_RECIPIENT_KEY, 'native-smoke');
+        await writeFile(join(process.env.RUNNER_TEMP, 'encrypted-native-smoke.json'), JSON.stringify(encrypted), { mode: 0o600 });
+      }
       const hostOutput = await readFile(publicOutput, 'utf8').catch(() => '');
       const failedStage = HOST_STAGES.find((value) => hostOutput.split(/\r?\n/).includes(
         `Simulator session failed at ${value}. Private diagnostics were not published.`));
