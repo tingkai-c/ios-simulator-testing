@@ -35,8 +35,6 @@ jobs:
       SESSION_ID: ${{ inputs.session_id }}
       RECIPIENT_KEY: ${{ inputs.recipient_key }}
       SESSION_MINUTES: ${{ inputs.lifetime_minutes }}
-      BOOTSTRAP_PATH: ${{ runner.temp }}/bootstrap/envelope.json
-      HOST_EXIT_PATH: ${{ runner.temp }}/simulator-host-exit.json
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -56,6 +54,9 @@ jobs:
         shell: bash
         run: |
           umask 077
+          export BOOTSTRAP_PATH="$RUNNER_TEMP/bootstrap/envelope.json"
+          export HOST_EXIT_PATH="$RUNNER_TEMP/simulator-host-exit.json"
+          echo "HOST_EXIT_PATH=$HOST_EXIT_PATH" >> "$GITHUB_ENV"
           nohup node host/host.mjs > "$RUNNER_TEMP/simulator-host-status.log" 2>&1 &
           echo "SIMULATOR_HOST_PID=$!" >> "$GITHUB_ENV"
           for attempt in $(seq 1 156); do
