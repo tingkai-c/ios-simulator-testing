@@ -10,6 +10,8 @@ import { seal } from '../skills/ios-simulator-testing/scripts/lib/envelope.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const VERSION = '0.21.36';
+export const HOST_STAGES = Object.freeze(['simulator discovery', 'simulator boot', 'UI runner preparation',
+  'proxy startup', 'tunnel startup', 'session serving', 'cleanup']);
 
 export function configuration(env = process.env) {
   const minutes = Number(env.SESSION_MINUTES ?? 15);
@@ -87,6 +89,7 @@ export async function main() {
   process.once('SIGTERM', terminate);
   process.once('SIGINT', terminate);
   let timer, succeeded = false, infrastructureFailed = false;
+  let stage = 'simulator discovery';
 
   async function launch(command, args, filename, { capture = false, timeout = 0 } = {}) {
     const log = await open(join(privateDir, filename), 'a', 0o600);
@@ -135,11 +138,14 @@ export async function main() {
     timer = setTimeout(terminate, 12 * 60 * 1000);
     const list = JSON.parse(await run('xcrun', ['simctl', 'list', 'devices', 'available', '--json'], { capture: true }));
     simulator = chooseSimulator(list);
+    stage = 'simulator boot';
     if (simulator.state !== 'Booted') await run('xcrun', ['simctl', 'boot', simulator.udid]);
     await run('xcrun', ['simctl', 'bootstatus', simulator.udid, '-b']);
+    stage = 'UI runner preparation';
     await run(executable, ['prepare', 'ios-runner', '--platform', 'ios', '--udid', simulator.udid,
       '--timeout', '240000']);
     if (ending) throw new Error('Session stopped during setup');
+    stage = 'proxy startup';
     const token = randomBytes(32).toString('hex');
     const proxy = await launch(executable, ['proxy', '--host', '127.0.0.1', '--port', '4310',
       '--daemon-auth-token', token], 'proxy.log');
@@ -153,6 +159,7 @@ export async function main() {
       gateway.once('error', reject);
       gateway.listen(4320, '127.0.0.1', resolveListen);
     });
+    stage = 'tunnel startup';
     const cloud = await launch('cloudflared', ['tunnel', '--no-autoupdate', '--url',
       'http://127.0.0.1:4320'], 'tunnel.log');
     const endpoint = await waitFor(async () => tunnelUrl(await readFile(join(privateDir, 'tunnel.log'), 'utf8')),
@@ -168,6 +175,7 @@ export async function main() {
     const envelope = seal(payload, config.recipientKey, config.sessionId);
     await mkdir(dirname(config.bootstrapPath), { recursive: true });
     await writeFile(config.bootstrapPath, JSON.stringify(envelope), { flag: 'wx', mode: 0o600 });
+    stage = 'session serving';
     process.stdout.write('Simulator session ready; encrypted connection bundle created.\n');
     clearTimeout(timer);
     timer = setTimeout(terminate, config.minutes * 60000);
@@ -183,9 +191,10 @@ export async function main() {
     return 0;
   } catch (error) {
     await writeFile(join(privateDir, 'host-error.log'), String(error?.stack ?? error), { mode: 0o600 });
-    process.stderr.write('Simulator session failed. Private diagnostics were not published.\n');
+    process.stderr.write(`Simulator session failed at ${stage}. Private diagnostics were not published.\n`);
     return 1;
   } finally {
+    stage = 'cleanup';
     ending = true;
     clearTimeout(timer);
     controller.abort();

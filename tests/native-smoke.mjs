@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
 import { keypair, unseal } from '../skills/ios-simulator-testing/scripts/lib/envelope.mjs';
 import { checkBootstrap } from '../skills/ios-simulator-testing/scripts/simulator.mjs';
+import { HOST_STAGES } from '../host/host.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const executable = join(root, 'skills/ios-simulator-testing/node_modules/.bin/agent-device');
@@ -193,6 +194,15 @@ async function main() {
     }
     await privateLog.close();
     await hostLog.close();
+    if (!passed) {
+      const hostOutput = await readFile(publicOutput, 'utf8').catch(() => '');
+      const failedStage = HOST_STAGES.find((value) => hostOutput.split(/\r?\n/).includes(
+        `Simulator session failed at ${value}. Private diagnostics were not published.`));
+      if (failedStage) {
+        // Reconstruct from the fixed allowlist; never echo arbitrary host output.
+        process.stderr.write(`Simulator session failed at ${failedStage}. Private diagnostics were not published.\n`);
+      }
+    }
     if (passed) await rm(directory, { recursive: true, force: true });
     // On failure, only generic status is public; diagnostic files remain local.
   }
