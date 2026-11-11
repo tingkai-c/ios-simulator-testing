@@ -2,15 +2,17 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { open, mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
 import { keypair, unseal } from '../skills/ios-simulator-testing/scripts/lib/envelope.mjs';
+import { checkBootstrap } from '../skills/ios-simulator-testing/scripts/simulator.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const executable = join(root, 'skills/ios-simulator-testing/node_modules/.bin/agent-device');
 const bundle = 'com.example.simulatorharness.demo';
+let stage = 'preflight';
 
 /** Native-only integration: the public tunnel transports synthetic inputs only. */
 async function main() {
@@ -28,7 +30,9 @@ async function main() {
   const children = new Set();
   let host, connection, hostComplete, passed = false;
   const clientEnv = { ...clean, AGENT_DEVICE_STATE_DIR: join(directory, 'client-state'),
+    AGENT_DEVICE_HOME: join(directory, 'client-home'), AGENT_DEVICE_CONFIG: join(directory, 'client-config.json'),
     AGENT_DEVICE_SESSION: sessionId, AGENT_DEVICE_NO_UPDATE_NOTIFIER: '1' };
+  await writeFile(clientEnv.AGENT_DEVICE_CONFIG, '{}', { mode: 0o600 });
 
   async function command(command, args, { capture = false, environment = clientEnv, timeout = 240000 } = {}) {
     const remaining = deadline - Date.now();
@@ -40,16 +44,28 @@ async function main() {
     let output = '';
     if (capture) child.stdout.on('data', (chunk) => { output += chunk; privateLog.write(chunk).catch(() => {}); });
     return new Promise((resolve, reject) => {
-      child.once('error', reject);
+      child.once('error', () => {
+        process.stderr.write(`Synthetic command ${basename(command)} could not start.\n`);
+        reject(new Error('Native smoke command could not start'));
+      });
       child.once('exit', (code) => {
         children.delete(child);
         if (code === 0) resolve(output.trim());
-        else reject(new Error('Native smoke command failed'));
+        else {
+          process.stderr.write(`Synthetic command ${basename(command)} failed (exit ${code ?? 'signal'}).\n`);
+          reject(new Error('Native smoke command failed'));
+        }
       });
     });
   }
 
-  async function device(...args) { return command(executable, args); }
+  async function device(...args) {
+    if (connection && !['connect', 'disconnect'].includes(args[0])) {
+      if (!args.includes('--platform')) args.push('--platform', 'ios');
+      args.push('--udid', connection.udid);
+    }
+    return command(executable, args);
+  }
   async function countIs(value) {
     await device('wait', `label="Count: ${value}"`, '10000');
     await device('is', 'visible', `label="Count: ${value}"`);
@@ -65,6 +81,7 @@ async function main() {
   }
 
   try {
+    stage = 'synthetic app build';
     process.stdout.write('Building synthetic simulator app.\n');
     const app = join(directory, 'HarnessDemo.app');
     await mkdir(app);
@@ -88,6 +105,7 @@ async function main() {
 <key>LSRequiresIPhoneOS</key><true/><key>UILaunchScreen</key><dict/>
 </dict></plist>`);
     await command('codesign', ['--force', '--sign', '-', '--timestamp=none', app]);
+    stage = 'host startup';
     process.stdout.write('Starting isolated simulator host.\n');
     host = spawn(process.execPath, [join(root, 'host/host.mjs')], {
       cwd: root, env: { ...clean, SESSION_ID: sessionId, SESSION_MINUTES: '10',
@@ -113,6 +131,8 @@ async function main() {
       await delay(500);
     }
     assert(connection, 'Host did not become ready');
+    checkBootstrap(connection, { sessionId, runId: process.env.GITHUB_RUN_ID || '1',
+      repository: process.env.GITHUB_REPOSITORY || 'example/harness' });
     assert.equal(connection.sessionId, sessionId);
     assert.equal(connection.runId, process.env.GITHUB_RUN_ID || '1');
     assert.equal(connection.repository, process.env.GITHUB_REPOSITORY || 'example/harness');
@@ -122,15 +142,19 @@ async function main() {
     assert.equal(connection.agentDeviceVersion, '0.21.36');
     assert(Date.parse(connection.expiresAt) > Date.now());
     clientEnv.AGENT_DEVICE_DAEMON_AUTH_TOKEN = connection.token;
+    stage = 'remote connect';
     process.stdout.write('Testing remote upload, observation, tap, and assertion.\n');
     await device('connect', 'proxy', '--daemon-base-url', connection.baseUrl);
+    stage = 'remote app upload';
     await device('install', bundle, app, '--platform', 'ios');
+    stage = 'remote UI interaction';
     await device('open', bundle, '--platform', 'ios');
     await countIs(0);
     await device('snapshot', '-i');
     await device('click', 'label="Increment"');
     await countIs(1);
     await device('close');
+    stage = 'fixture export';
     process.stdout.write('Testing app-data export and restore.\n');
     const checkpoint = await state('export');
     assert.equal(checkpoint.subarray(0, 2).toString(), 'PK');
@@ -139,7 +163,9 @@ async function main() {
     await device('click', 'label="Increment"');
     await countIs(2);
     await device('close');
+    stage = 'fixture import';
     await state('import', checkpoint);
+    stage = 'restored UI assertion and capture';
     await device('open', bundle, '--platform', 'ios');
     await countIs(1);
     const screenshot = join(directory, 'synthetic-screen.png');
@@ -147,6 +173,7 @@ async function main() {
     assert.deepEqual((await readFile(screenshot)).subarray(0, 8), Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
     await device('close');
     await device('disconnect');
+    stage = 'session cleanup';
     const finish = await fetch(`${connection.controlUrl}/finish`, { method: 'POST',
       headers: { authorization: `Bearer ${connection.token}` }, signal: AbortSignal.timeout(10000) });
     assert.equal(finish.status, 200);
@@ -173,6 +200,6 @@ async function main() {
 
 try { await main(); }
 catch {
-  process.stderr.write('Synthetic native smoke failed; private diagnostic files were not published.\n');
+  process.stderr.write(`Synthetic native smoke failed at ${stage}; private diagnostic files were not published.\n`);
   process.exitCode = 1;
 }
