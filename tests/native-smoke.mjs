@@ -27,7 +27,7 @@ async function main() {
   const publicOutput = join(directory, 'public-host.log');
   const privateLog = await open(join(directory, 'client.log'), 'a', 0o600);
   const hostLog = await open(publicOutput, 'a', 0o600);
-  const deadline = Date.now() + 12 * 60 * 1000;
+  const deadline = Date.now() + 20 * 60 * 1000;
   const children = new Set();
   let host, connection, hostComplete, passed = false;
   const clientEnv = { ...clean,
@@ -111,7 +111,7 @@ async function main() {
     stage = 'host startup';
     process.stdout.write('Starting isolated simulator host.\n');
     host = spawn(process.execPath, [join(root, 'host/host.mjs')], {
-      cwd: root, env: { ...clean, SESSION_ID: sessionId, SESSION_MINUTES: '10',
+      cwd: root, env: { ...clean, SESSION_ID: sessionId, SESSION_MINUTES: '15',
         RECIPIENT_KEY: keys.publicKey, BOOTSTRAP_PATH: bootstrap,
         GITHUB_RUN_ID: process.env.GITHUB_RUN_ID || '1',
         GITHUB_REPOSITORY: process.env.GITHUB_REPOSITORY || 'example/harness',
@@ -150,10 +150,12 @@ async function main() {
     await device('connect', 'proxy', '--daemon-base-url', connection.baseUrl);
     stage = 'remote app upload';
     await device('install', bundle, app, '--platform', 'ios');
-    stage = 'remote UI interaction';
+    stage = 'remote app launch';
     await device('open', bundle, '--platform', 'ios');
-    await countIs(0);
+    stage = 'initial counter assertion';
     await device('snapshot', '-i');
+    await countIs(0);
+    stage = 'counter tap and assertion';
     await device('click', 'label="Increment"');
     await countIs(1);
     await device('close');

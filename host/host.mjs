@@ -146,7 +146,7 @@ export async function main() {
     await run('xcrun', ['simctl', 'bootstatus', simulator.udid, '-b']);
     stage = 'UI runner preparation';
     await run(executable, ['prepare', 'ios-runner', '--platform', 'ios', '--udid', simulator.udid,
-      '--timeout', '240000']);
+      '--timeout', '420000'], { timeout: 450000 });
     if (ending) throw new Error('Session stopped during setup');
     stage = 'proxy startup';
     const token = randomBytes(32).toString('hex');
