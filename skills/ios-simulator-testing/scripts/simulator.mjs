@@ -139,15 +139,28 @@ async function start(options) {
   await save(path, session);
   process.stderr.write(`Session state: ${path}\n`);
   try {
-    await gh(['api', '--method', 'POST', `repos/${repository}/actions/workflows/${workflow}/dispatches`, '--input', '-'], JSON.stringify({
-      ref,
+    const dispatched = await gh(['api', '--method', 'POST', `repos/${repository}/actions/workflows/${workflow}/dispatches`,
+      '-H', 'X-GitHub-Api-Version: 2022-11-28', '--input', '-'], JSON.stringify({
+      ref, return_run_details: true,
       inputs: { session_id: sessionId, recipient_key: keys.publicKey, lifetime_minutes: String(minutes), runner, ios_version: iosVersion },
     }));
     let run;
-    const discoveryDeadline = Date.now() + 120_000;
-    while (!run && Date.now() < discoveryDeadline) {
-      run = await findRun(session);
-      if (!run) await sleep(5000);
+    if (dispatched) {
+      if (!Number.isSafeInteger(dispatched.workflow_run_id) || dispatched.workflow_run_id < 1) {
+        throw new Error('GitHub dispatch returned an invalid run ID; inspect this session before retrying');
+      }
+      session.runId = dispatched.workflow_run_id;
+      session.runUrl = `https://github.com/${repository}/actions/runs/${session.runId}`;
+      await save(path, session);
+      run = await gh(['api', `repos/${repository}/actions/runs/${session.runId}`]);
+      if (run.id !== session.runId) throw new Error('GitHub run identity differs from the dispatch response');
+    } else {
+      // Compatibility with servers that still return 204; never infer identity from time/order.
+      const discoveryDeadline = Date.now() + 120_000;
+      while (!run && Date.now() < discoveryDeadline) {
+        run = await findRun(session);
+        if (!run) await sleep(5000);
+      }
     }
     if (!run) throw new Error('Dispatched run has not appeared; inspect this session before retrying');
     session.runId = run.id;

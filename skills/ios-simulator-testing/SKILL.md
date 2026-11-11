@@ -66,3 +66,5 @@ node "$SIM" status --state "$STATE"
 ```
 
 `stopRequested` means shutdown was requested. Poll `status` for up to two minutes; if the job still runs, cancel that exact `runId` with `gh run cancel RUN_ID --repo tingkai-c/ios-simulator-testing` and verify completion. Report cleanup uncertainty if GitHub is unavailable. The absolute host lifetime is a fallback, not the normal cleanup mechanism. Report the tested app build/ref, run URL, scenario/assertion results, local evidence paths, and any device-only or untested behavior. Keep private screenshots, fixtures, UI text, and app diagnostics local unless the user authorizes their destination.
+
+If status remains queued/in progress while cancel/force-cancel returns HTTP 409 or says the run is completed, report the inconsistent state and exact run URL; do not keep allocating replacements. GitHub documents [stuck or out-of-sync workflow runs](https://docs.github.com/en/actions/how-tos/troubleshoot-workflows#canceling-workflows) that may require Support to clear.

@@ -15,8 +15,12 @@ fs.appendFileSync(process.env.CALL_LOG, JSON.stringify(args)+'\\n');
 const path = args.find(value => value.startsWith('repos/')) || '';
 const send = value => console.log(JSON.stringify(value));
 if (path.includes('/commits/')) send({sha: process.env.FAIL_MODE==='ref' ? 'b'.repeat(40) : 'a'.repeat(40)});
-else if (path.endsWith('/dispatches')) fs.writeFileSync(process.env.DISPATCH_INPUT, fs.readFileSync(0));
+else if (path.endsWith('/dispatches')) {
+ fs.writeFileSync(process.env.DISPATCH_INPUT, fs.readFileSync(0));
+ if(['startup','direct-run'].includes(process.env.FAIL_MODE)) send({workflow_run_id:123,run_url:'https://api.github.com/repos/owner/harness/actions/runs/123',html_url:'https://github.com/owner/harness/actions/runs/123'});
+}
 else if (path.includes('/workflows/') && path.includes('/runs?')) {
+ if(['startup','direct-run'].includes(process.env.FAIL_MODE)) { console.error('Run title is not expanded yet; listing cannot identify the dispatched run'); process.exit(1); }
  const input = JSON.parse(fs.readFileSync(process.env.DISPATCH_INPUT));
  send({workflow_runs:[{id:123,display_title:'simulator-'+input.inputs.session_id,head_sha:process.env.FAIL_MODE==='run'?'b'.repeat(40):'a'.repeat(40),html_url:'https://github.com/owner/harness/actions/runs/123'}]});
 } else if (path.includes('/artifacts?')) {
@@ -25,11 +29,11 @@ else if (path.includes('/workflows/') && path.includes('/runs?')) {
  send({artifacts:[]});
 }
 else if (path.endsWith('/cancel')) {}
-else if (path.endsWith('/runs/123')) send({id:123,status:['readiness','transient','startup'].includes(process.env.FAIL_MODE)?'completed':'in_progress',conclusion:process.env.FAIL_MODE==='startup'?'startup_failure':'failure'});
+else if (path.endsWith('/runs/123')) send({id:123,head_sha:['run','direct-run'].includes(process.env.FAIL_MODE)?'b'.repeat(40):'a'.repeat(40),html_url:'https://github.com/owner/harness/actions/runs/123',display_title:'Live iOS simulator',status:['readiness','transient','startup'].includes(process.env.FAIL_MODE)?'completed':'in_progress',conclusion:process.env.FAIL_MODE==='startup'?'startup_failure':'failure'});
 else { console.error('Unexpected fake GitHub request'); process.exit(1); }
 `;
 
-for (const mode of ['ref', 'run', 'readiness', 'transient', 'startup']) {
+for (const mode of ['ref', 'run', 'readiness', 'transient', 'startup', 'direct-run']) {
   test(`startup ${mode} failure does not leave a second or untracked simulator job`, async () => {
     const directory = await mkdtemp(join(tmpdir(), 'simulator-client-test-'));
     try {
@@ -47,10 +51,17 @@ for (const mode of ['ref', 'run', 'readiness', 'transient', 'startup']) {
       assert.equal(dispatches.length, mode === 'ref' ? 0 : 1, result.stderr);
       if (mode !== 'ref') assert.equal(JSON.parse(await readFile(join(directory, 'dispatch.json'), 'utf8')).inputs.ios_version, '26.2');
       const cancellations = calls.filter((args) => args.some((arg) => arg.endsWith('/cancel')));
-      assert.equal(cancellations.length, mode === 'run' ? 1 : 0);
+      assert.equal(cancellations.length, ['run', 'direct-run'].includes(mode) ? 1 : 0);
       if (cancellations.length) assert.ok(cancellations[0].includes('repos/owner/harness/actions/runs/123/cancel'));
       assert.equal(calls.some((args) => args.includes('download')), false);
       if (mode === 'transient') assert.equal(calls.filter(args=>args.some(arg=>arg.includes('/artifacts?'))).length, 2);
+      if (['startup', 'direct-run'].includes(mode)) {
+        assert.equal(JSON.parse(await readFile(join(directory, 'dispatch.json'), 'utf8')).return_run_details, true);
+        assert.equal(calls.some(args => args.some(arg => arg.includes('/workflows/') && arg.includes('/runs?'))), false);
+        const state = JSON.parse(await readFile(result.stderr.match(/Session state: (.+)\n/)[1], 'utf8'));
+        assert.equal(state.runId, 123);
+        assert.equal(state.runUrl, 'https://github.com/owner/harness/actions/runs/123');
+      }
       if (mode === 'startup') {
         assert.match(result.stderr, /GitHub workflow startup failed \(startup_failure\)/);
         assert.match(result.stderr, /annotations: https:\/\/github\.com\/owner\/harness\/actions\/runs\/123/);
