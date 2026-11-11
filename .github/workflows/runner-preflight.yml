@@ -1,6 +1,11 @@
 name: Public runner preflight
 on:
   workflow_dispatch:
+    inputs:
+      recipient_key:
+        description: Public RSA key for encrypted setup diagnostics
+        required: true
+        type: string
 permissions:
   contents: read
 jobs:
@@ -25,8 +30,21 @@ jobs:
           AGENT_DEVICE_NO_UPDATE_NOTIFIER: '1'
         run: |
           xcodebuild -version
-          skills/ios-simulator-testing/node_modules/.bin/agent-device boot --platform ios --pick newest
-          skills/ios-simulator-testing/node_modules/.bin/agent-device prepare ios-runner --platform ios --timeout 240000 --json
+          skills/ios-simulator-testing/node_modules/.bin/agent-device boot --platform ios --pick newest --timeout 300000
+          skills/ios-simulator-testing/node_modules/.bin/agent-device prepare ios-runner --platform ios --timeout 480000 --json
+      - name: Encrypt public-tool setup diagnostics
+        if: always()
+        env:
+          RECIPIENT_KEY: ${{ inputs.recipient_key }}
+        run: node tests/seal-preflight.mjs
+      - name: Retain only encrypted setup diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: encrypted-preflight
+          path: ${{ runner.temp }}/encrypted-preflight.json
+          if-no-files-found: warn
+          retention-days: 1
       - name: Stop simulators
         if: always()
         run: xcrun simctl shutdown all >/dev/null 2>&1 || true
