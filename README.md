@@ -4,7 +4,7 @@ A public GitHub Actions harness for temporary, **live** iOS simulator sessions. 
 
 **Prototype.** Local checks and native smoke results are recorded in [docs/validation.md](docs/validation.md). Review [the privacy boundary](docs/privacy.md) before using private app builds.
 
-The public repository holds the harness and skill. The runner receives an app over an authenticated connection; it does not check out a private repository or receive its GitHub credentials. A client-generated public key encrypts the session's connection credentials. Only this encrypted bootstrap is uploaded to Actions artifacts. App data and captures download to the agent's machine.
+The public repository holds the harness and skill. The runner receives an app over an authenticated connection; it does not check out a private repository or receive its GitHub credentials. A client-generated public key encrypts the session's connection credentials. During a live session, only its encrypted bootstrap is uploaded to Actions artifacts. App data and captures download to the agent's machine.
 
 ## Install the skill
 
@@ -37,6 +37,8 @@ node skills/ios-simulator-testing/scripts/simulator.mjs stop --state SESSION_JSO
 ```
 
 Sessions default to 15 minutes; configurable from 5 to 30. iOS 26.2 is the default runtime, matching the driver’s upstream CI. Set `--ios-version VERSION` or `--ios-version newest` for another installed runtime; unavailable versions fail explicitly. `--runner xcode-27` is available for apps requiring that preview toolchain. Each job owns one simulator. Run separate sessions for independent agents; keep commands serial within a session. Public workflow metadata reveals runner choice, session timing, and job status.
+
+For a public sample, run the [demo build workflow](.github/workflows/demo-build.yml) and download its `harness-demo` artifact. Verify `harness-demo.sha256`, extract `harness-demo.zip`, and install `HarnessDemo.app` as `com.example.simulatorharness.demo`. It contains a counter and an Increment button; no private project is needed.
 
 ## App data
 

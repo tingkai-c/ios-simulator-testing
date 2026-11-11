@@ -5,7 +5,7 @@
 1. The agent generates a fresh RSA-3072 keypair locally. The private key lives in an owner-only local session directory. The workflow receives only its public key, random session ID, runtime selection, and expiration budget.
 2. A clean macOS job boots one simulator, prepares the pinned agent-device XCTest runner, and starts a loopback proxy plus authenticated fixture gateway. It generates a random 256-bit bearer token.
 3. A Cloudflare Quick Tunnel exposes the gateway. The host encrypts the endpoint, token, run identity, simulator UDID, and expiration with a random AES-256-GCM key, wraps that key with RSA-OAEP-SHA256, and binds the envelope to the session ID as authenticated data.
-4. The only public artifact is that encrypted envelope. The agent decrypts it locally and checks the exact requested run, repository, session, version, endpoint shape, and expiration. Start also checks that the dispatched workflow runs the reviewed commit.
+4. The only public artifact from a live session is that encrypted envelope. The agent decrypts it locally and checks the exact requested run, repository, session, version, endpoint shape, and expiration. Start also checks that the dispatched workflow runs the reviewed commit.
 5. The agent uploads its private simulator `.app` directly through agent-device. Screenshots, UI snapshots, app logs, and fixture ZIPs return through authenticated requests to private local destinations. They never need to enter public Actions artifacts.
 6. Stop requests, absolute expiration, failure handling, and workflow cleanup terminate the tunnel and simulator. The runner VM is ephemeral; this is not a guarantee of cryptographic erasure of its storage.
 
@@ -15,11 +15,13 @@ The workflow definition, code, public key, random session ID, GitHub actor, runn
 
 No private repository token is provisioned on the runner. The job's own `GITHUB_TOKEN` has read access to this public repository. Only maintainers/collaborators with workflow dispatch rights can allocate sessions. There are no issue-comment, fork-PR, `pull_request_target`, or arbitrary checkout triggers.
 
+Separate manual synthetic-test workflows use only the public demo source. They can publish that public demo build, or diagnostics encrypted to an explicitly supplied public key. Those artifact paths are not part of live private-app sessions.
+
 ## Sensitive host output
 
 The upstream proxy **prints its bearer token even when explicitly supplied**. Child stdout/stderr, daemon state, app logs, XCTest logs/results, traces, and caches can also contain secrets or typed text. Capture child output in an owner-only temporary directory. GitHub log masking is an extra measure, not the privacy boundary. Upload only the explicitly named encrypted bootstrap file, never a directory glob of runner diagnostics.
 
-Failure diagnostics stay on the ephemeral host. The public error is deliberately generic. A failure before the tunnel is available can therefore require reproducing with synthetic inputs. Never add raw debug artifacts to diagnose a private run.
+For live private-app sessions, failure diagnostics stay on the ephemeral host. The public error is deliberately generic. A failure before the tunnel is available can therefore require reproducing with synthetic inputs. Never add raw debug artifacts to diagnose a private run.
 
 ## Trust and limits
 
@@ -31,7 +33,7 @@ An installed simulator app executes host code. Treat the app and its build as tr
 
 The fixture gateway accepts only a validated bundle ID, a fixed simulator, and bounded ZIP data. It stops the simulator before copying container files. Imports validate paths, entry types, expansion limits, and the manifest before replacing `Documents` and `Library`. This does not cover Keychain, shared App Groups, external services, or portable login restoration. Fixture import is a replacement operation on the disposable simulator.
 
-Only the tunnel connection bundle is encrypted for public storage. Screenshots and fixtures are private because they are delivered directly to a controlled client directory. Sharing or uploading them later is a separate decision.
+For live private-app sessions, only the tunnel connection bundle is encrypted for public storage. Screenshots and fixtures are private because they are delivered directly to a controlled client directory. Sharing or uploading them later is a separate decision.
 
 ## Evidence
 

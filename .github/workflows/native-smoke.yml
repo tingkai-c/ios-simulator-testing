@@ -26,7 +26,7 @@ jobs:
         run: |
           bun install --cwd skills/ios-simulator-testing --frozen-lockfile
           brew install cloudflared
-      - name: Exercise synthetic app, live tunnel, controls, and fixtures
+      - name: Exercise synthetic app, authenticated controls, and fixtures
         env:
           DIAGNOSTIC_RECIPIENT_KEY: ${{ inputs.recipient_key }}
         run: node tests/native-smoke.mjs

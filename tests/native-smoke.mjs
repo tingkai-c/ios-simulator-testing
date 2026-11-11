@@ -15,7 +15,7 @@ const executable = join(root, 'skills/ios-simulator-testing/node_modules/.bin/ag
 const bundle = 'com.example.simulatorharness.demo';
 let stage = 'preflight';
 
-/** Native-only integration: the public tunnel transports synthetic inputs only. */
+/** Native fixture integration; the separate Linux agent test covers the public tunnel. */
 async function main() {
   if (process.platform !== 'darwin') throw new Error('Native smoke requires macOS');
   process.umask(0o077);
@@ -144,9 +144,12 @@ async function main() {
     assert.equal(connection.baseUrl, `${connection.controlUrl}/agent-device`);
     assert.equal(connection.agentDeviceVersion, '0.21.36');
     assert(Date.parse(connection.expiresAt) > Date.now());
+    // Keep fixture correctness independent of Quick Tunnel/DNS availability.
+    // The real bootstrap is validated above; only this synthetic client uses loopback.
+    connection = { ...connection, controlUrl: 'http://127.0.0.1:4320', baseUrl: 'http://127.0.0.1:4320/agent-device' };
     clientEnv.AGENT_DEVICE_DAEMON_AUTH_TOKEN = connection.token;
     stage = 'remote connect';
-    process.stdout.write('Testing remote upload, observation, tap, and assertion.\n');
+    process.stdout.write('Testing authenticated upload, observation, tap, and assertion.\n');
     await device('connect', 'proxy', '--daemon-base-url', connection.baseUrl);
     stage = 'remote app upload';
     await device('install', bundle, app, '--platform', 'ios');
