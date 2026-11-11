@@ -11,7 +11,7 @@ import { seal } from '../skills/ios-simulator-testing/scripts/lib/envelope.mjs';
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const VERSION = '0.21.36';
 export const HOST_STAGES = Object.freeze(['simulator discovery', 'simulator boot', 'UI runner preparation',
-  'proxy startup', 'tunnel startup', 'session serving', 'cleanup']);
+  'proxy startup', 'tunnel startup', 'tunnel edge connection', 'tunnel public health', 'session serving', 'cleanup']);
 
 export function configuration(env = process.env) {
   const minutes = Number(env.SESSION_MINUTES ?? 15);
@@ -160,14 +160,21 @@ export async function main() {
       gateway.listen(4320, '127.0.0.1', resolveListen);
     });
     stage = 'tunnel startup';
-    const cloud = await launch('cloudflared', ['tunnel', '--no-autoupdate', '--url',
+    const cloud = await launch('cloudflared', ['tunnel', '--no-autoupdate', '--protocol', 'http2',
+      '--metrics', '127.0.0.1:20241', '--url',
       'http://127.0.0.1:4320'], 'tunnel.log');
     const endpoint = await waitFor(async () => tunnelUrl(await readFile(join(privateDir, 'tunnel.log'), 'utf8')),
       Date.now() + 90000, [cloud.child, proxy.child]);
+    stage = 'tunnel edge connection';
+    await waitFor(async () => {
+      try { return (await fetch('http://127.0.0.1:20241/ready', { signal: AbortSignal.timeout(1000) })).ok; }
+      catch { return false; }
+    }, Date.now() + 90000, [cloud.child, proxy.child]);
+    stage = 'tunnel public health';
     await waitFor(async () => {
       try { return (await fetch(`${endpoint}/health`, { signal: AbortSignal.timeout(3000) })).ok; }
       catch { return false; }
-    }, Date.now() + 60000, [cloud.child, proxy.child]);
+    }, Date.now() + 120000, [cloud.child, proxy.child]);
     const expiresAt = new Date(Date.now() + config.minutes * 60000).toISOString();
     const payload = { sessionId: config.sessionId, runId: config.runId, repository: config.repository,
       baseUrl: `${endpoint}/agent-device`, controlUrl: endpoint, token, udid: simulator.udid,

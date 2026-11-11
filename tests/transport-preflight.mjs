@@ -11,7 +11,8 @@ child.stdout.on('data', (chunk) => { log += chunk; });
 child.stderr.on('data', (chunk) => { log += chunk; });
 let success = false;
 try {
-  for (let attempt = 0; attempt < 90; attempt++) {
+  const deadline = Date.now() + 180000;
+  while (Date.now() < deadline) {
     if (child.exitCode !== null) break;
     const endpoint = log.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com\b/)?.[0];
     if (endpoint) {
