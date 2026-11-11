@@ -1,0 +1,4 @@
+interface:
+  display_name: "Cloud iOS Simulator"
+  short_description: "Test iOS apps through live GitHub simulator sessions"
+  default_prompt: "Use $ios-simulator-testing to test this app build in a live cloud simulator and collect private evidence."
