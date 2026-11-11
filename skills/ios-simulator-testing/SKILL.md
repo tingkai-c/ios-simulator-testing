@@ -13,7 +13,7 @@ Read [references/private-apps.md](references/private-apps.md) when sourcing a bu
 
 Require Node 24+, `gh` with workflow dispatch/cancel access to the harness repo, and the skill's pinned dependency (`bun install --cwd "$SKILL_DIR" --frozen-lockfile`). Obtain a trusted simulator `.app` for ARM64; signed device/TestFlight IPAs are a different target. Reuse the app's existing build process.
 
-Select a reviewed commit in `tingkai-c/ios-simulator-testing` and a branch/tag pointing to it. Never pass private source credentials, artifact URLs, app data, or test names as public workflow inputs. The helper supplies only a random session ID and public encryption key.
+Select a reviewed commit in `tingkai-c/ios-simulator-testing` and a branch/tag pointing to it. Read the harness repository’s `docs/validation.md` at that commit for verified capabilities and remaining gaps. Never pass private source credentials, artifact URLs, app data, or test names as public workflow inputs. The helper supplies only a random session ID and public encryption key.
 
 ## Allocate and connect
 
@@ -37,7 +37,7 @@ node "$SIM" exec --state "$STATE" -- is visible 'label="Expected result"'
 node "$SIM" exec --state "$STATE" -- screenshot /private/evidence/result.png
 ```
 
-Derive refs from a fresh snapshot; refresh them after navigation, mutations, or fixture changes. Prefer accessible refs/selectors; use `press x y` with screenshot evidence when necessary. `fill @ref "synthetic text"` enters text. Consult `"$SKILL_DIR/node_modules/.bin/agent-device" help COMMAND` when command details differ.
+Derive refs from a fresh snapshot; refresh them after navigation, mutations, or fixture changes. If a selector is ambiguous, narrow it by role/identifier or use a fresh ref. Prefer accessible refs/selectors; use `press x y` with screenshot evidence when necessary. `fill @ref "synthetic text"` enters text. Consult `"$SKILL_DIR/node_modules/.bin/agent-device" help COMMAND` when command details differ.
 
 A successful tap proves dispatch only. Check the intended UI or app behavior and preserve local evidence. For unexpected behavior, inspect a new snapshot and app logs before retrying the mutation. Distinguish app assertion failures from lost/expired sessions and unsupported simulator capabilities. Stop retries when the session expires; report the remaining validation gap.
 
