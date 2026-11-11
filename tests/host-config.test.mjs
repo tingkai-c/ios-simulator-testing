@@ -14,9 +14,19 @@ test('configuration rejects malformed and overlong capabilities before launching
   assert.equal(configuration(environment).minutes, 15);
   for (const patch of [{ SESSION_ID: '../../file' }, { SESSION_MINUTES: '31' },
     { SESSION_MINUTES: 'NaN' }, { SESSION_MINUTES: '0' }, { GITHUB_RUN_ID: 'abc' },
-    { RECIPIENT_KEY: 'invalid' }, { GITHUB_REPOSITORY: 'file:///tmp' }]) {
+    { RECIPIENT_KEY: 'invalid' }, { GITHUB_REPOSITORY: 'file:///tmp' }, { SIMULATOR_IOS_VERSION: '../26.2' }]) {
     assert.throws(() => configuration({ ...environment, ...patch }));
   }
+});
+
+test('explicit runtime selection never silently uses a different iOS version', () => {
+  const list = { devices: {
+    'com.apple.CoreSimulator.SimRuntime.iOS-26-2': [{ name: 'iPhone 17', udid: 'supported', isAvailable: true }],
+    'com.apple.CoreSimulator.SimRuntime.iOS-26-5': [{ name: 'iPhone 17', udid: 'latest', isAvailable: true }],
+  } };
+  assert.equal(chooseSimulator(list, '26.2').udid, 'supported');
+  assert.equal(chooseSimulator(list).udid, 'latest');
+  assert.throws(() => chooseSimulator(list, '25.0'));
 });
 
 test('simulator selection picks available iPhone from newest iOS runtime', () => {

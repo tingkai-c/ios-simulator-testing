@@ -111,7 +111,7 @@ async function main() {
     stage = 'host startup';
     process.stdout.write('Starting isolated simulator host.\n');
     host = spawn(process.execPath, [join(root, 'tests/native-host.mjs')], {
-      cwd: root, env: { ...clean, SESSION_ID: sessionId, SESSION_MINUTES: '15',
+      cwd: root, env: { ...clean, SESSION_ID: sessionId, SESSION_MINUTES: '15', SIMULATOR_IOS_VERSION: '26.2',
         RECIPIENT_KEY: keys.publicKey, BOOTSTRAP_PATH: bootstrap,
         GITHUB_RUN_ID: process.env.GITHUB_RUN_ID || '1',
         GITHUB_REPOSITORY: process.env.GITHUB_REPOSITORY || 'example/harness',

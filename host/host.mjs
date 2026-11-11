@@ -21,19 +21,22 @@ export function configuration(env = process.env) {
   if (!/^\d+$/.test(env.GITHUB_RUN_ID ?? '')) throw new Error('Invalid run identifier');
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(env.GITHUB_REPOSITORY ?? '')) throw new Error('Invalid repository');
   if (!env.BOOTSTRAP_PATH) throw new Error('Missing bootstrap output path');
+  const iosVersion = env.SIMULATOR_IOS_VERSION ?? 'newest';
+  if (iosVersion !== 'newest' && !/^\d{1,2}\.\d{1,2}(?:\.\d{1,2})?$/.test(iosVersion)) throw new Error('Invalid iOS runtime version');
   if (!env.RECIPIENT_KEY || env.RECIPIENT_KEY.length > 8192) throw new Error('Invalid recipient key');
   const key = createPublicKey({ key: Buffer.from(env.RECIPIENT_KEY, 'base64'), format: 'der', type: 'spki' });
   if (key.asymmetricKeyType !== 'rsa' || key.asymmetricKeyDetails.modulusLength < 3072) {
     throw new Error('Recipient key must be RSA 3072 or stronger');
   }
-  return { sessionId: env.SESSION_ID, minutes, recipientKey: env.RECIPIENT_KEY,
+  return { sessionId: env.SESSION_ID, minutes, iosVersion, recipientKey: env.RECIPIENT_KEY,
     runId: env.GITHUB_RUN_ID, repository: env.GITHUB_REPOSITORY,
     bootstrapPath: resolve(env.BOOTSTRAP_PATH), temporaryRoot: env.RUNNER_TEMP || tmpdir() };
 }
 
-export function chooseSimulator(list) {
+export function chooseSimulator(list, iosVersion = 'newest') {
   const candidates = Object.entries(list.devices ?? {}).flatMap(([runtime, devices]) => {
     if (!runtime.includes('.iOS-')) return [];
+    if (iosVersion !== 'newest' && runtime.split('.iOS-')[1] !== iosVersion.replaceAll('.', '-')) return [];
     const version = runtime.split('.iOS-')[1].split('-').map(Number);
     return devices.filter((device) => device.isAvailable && /^iPhone\b/.test(device.name))
       .map((device) => ({ ...device, version }));
@@ -140,7 +143,7 @@ export async function main({ onFailure } = {}) {
     // Setup has its own bound; the interactive lifetime starts only when ready.
     timer = setTimeout(terminate, 12 * 60 * 1000);
     const list = JSON.parse(await run('xcrun', ['simctl', 'list', 'devices', 'available', '--json'], { capture: true }));
-    simulator = chooseSimulator(list);
+    simulator = chooseSimulator(list, config.iosVersion);
     stage = 'simulator boot';
     if (simulator.state !== 'Booted') await run('xcrun', ['simctl', 'boot', simulator.udid]);
     await run('xcrun', ['simctl', 'bootstatus', simulator.udid, '-b']);
