@@ -6,13 +6,13 @@ const { syncBuiltinESMExports } = require('node:module');
 const cache = new Map();
 
 function resolveTunnel(hostname, family) {
-  const type = family === 6 ? 28 : 1;
+  const type = family === 6 || family === 'IPv6' ? 28 : 1;
   const key = `${hostname}:${type}`;
   const cached = cache.get(key);
   if (cached && cached.until > Date.now()) return Promise.resolve(cached.records);
   return new Promise((resolve, reject) => {
     const request = https.get(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(hostname)}&type=${type}`, {
-      headers: { accept: 'application/dns-json' }, timeout: 5000,
+      headers: { accept: 'application/dns-json' }, timeout: 5000, signal: AbortSignal.timeout(5000),
     }, (response) => {
       let data = '';
       response.on('data', (chunk) => {

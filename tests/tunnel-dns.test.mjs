@@ -34,3 +34,10 @@ test('fallback failure and other system errors retain the original error', async
   const fn = createLookup((_name, _options, callback) => callback(refused), () => { throw new Error('unexpected'); });
   assert.deepEqual(await lookup(fn, host), [refused, undefined, undefined]);
 });
+test('fallback forwards Node string family options', async () => {
+  const fn = createLookup((_name, _options, callback) => callback(missing), async (_name, family) => {
+    assert.equal(family, 'IPv6');
+    return [{ address: '2001:db8::1', family: 6 }];
+  });
+  assert.deepEqual(await lookup(fn, host, { family: 'IPv6' }), [null, '2001:db8::1', 6]);
+});

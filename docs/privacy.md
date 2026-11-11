@@ -25,6 +25,8 @@ Failure diagnostics stay on the ephemeral host. The public error is deliberately
 
 The live connection uses TLS through Cloudflare, which terminates that TLS. Encrypting the bootstrap does not hide live app uploads and UI data from that transport provider. GitHub and the host toolchain can also access runner memory and disk. Choose another transport/host if those providers are outside the project's trust boundary.
 
+If system DNS returns `ENOTFOUND` for an exact `*.trycloudflare.com` tunnel hostname, the bundled Node preload retries its address lookup over HTTPS through Cloudflare DNS. Other names and errors retain system DNS behavior. The connection still verifies the original tunnel hostname's TLS certificate; no system resolver settings are changed.
+
 An installed simulator app executes host code. Treat the app and its build as trusted by the session owner; this harness is not an isolation boundary for untrusted uploaded programs. A maintainer who changes the host workflow can exfiltrate data: inspect and pin the harness commit, restrict write access, and use synthetic credentials/fixtures. Agent-device authentication is bearer access to the session, not a multi-tenant sandbox.
 
 The fixture gateway accepts only a validated bundle ID, a fixed simulator, and bounded ZIP data. It stops the simulator before copying container files. Imports validate paths, entry types, expansion limits, and the manifest before replacing `Documents` and `Library`. This does not cover Keychain, shared App Groups, external services, or portable login restoration. Fixture import is a replacement operation on the disposable simulator.
